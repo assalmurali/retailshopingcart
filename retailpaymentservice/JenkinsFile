@@ -1,0 +1,70 @@
+
+pipeline {
+    agent  label {  'maven' } 
+	options {timeout(time:40,unit:'MINUTES')}
+	environment{
+	          LS_VERSION_MODE='tag'
+			  }
+			  
+			  
+    stages {
+	
+	    stage('Intialize') {
+            steps {
+                sh 'mvn --version'
+            }
+        }
+	
+	
+        stage('build container Image') {
+            steps {
+                sh 'mvn clean package'
+				deploy adapters: [tomcat9(credentialsId: 'tomcat_credential', path: '', url: 'http://dayal-test.letspractice.tk:8081')], contextPath: '/pipeline', onFailure: false, war: 'webapp/target/*.war' 
+                sh 'mvn clean install -D javax.net.ssl.truststore=cacerts -Djavax.net.ssl.truststorePassword='changIt' java -jar target/paymentservice-1.0-SNAPSHOT-jar-with-dependencies.jar
+			}
+        }
+		
+		stage('ECS deployment process') {
+		when {experssion {return env.LS_GIT_BRANCH=="master.*|feature.*|development.*"}}
+            steps {
+                oc create secret docker-registry docker-hub \ 
+                docker-server=docker.io \
+                docker-username=TestUser \ 
+                docker-password=Test123 \ 
+
+                oc set build-secret --pull bc/retailchain-java-spring-boot docker-hub
+            }
+        }
+		
+		stage('Publish uDeploy ') {
+		when {experssion {return env.LS_GIT_BRANCH=="master.*|feature.*|development.*"}}
+             steps {
+              step([$class: 'UCDeployPublisher',
+                   siteName: 'udeploy-server',
+            component: [
+                    componentName: 'DemoApp-APP',
+                    delivery: [
+                        pushVersion: '${BUILD_NUMBER}',
+                        baseDir: '${WORKSPACE}',
+                        fileIncludePatterns: '**/*',
+                        fileExcludePatterns: '',
+                        pushDescription: 'Pushed from Jenkins',
+                        pushIncremental: false
+                    ]
+                ],
+                deploy: [
+                    deployApp: 'retailChainApp',
+                    deployEnv: 'Test 1',
+                    deployProc: 'Retailchain Process'
+                ]
+        ])           
+    }
+        }
+    
+	}
+	post {
+	    always{
+		  stepFinalise()
+		  }
+}
+}

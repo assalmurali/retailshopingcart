@@ -1,0 +1,7 @@
+FROM openjdk:8-jdk-alpine
+ARG JAR_FILE=target/*.jar
+copy ./target/secured-app-service-0.0.1-SNAPSHOT.jar secured-app-service-0.0.1-SNAPSHOT.jar
+RUN chmod 777 secured-app-service-0.0.1-SNAPSHOT.jar
+CMD ["java","-jar","secured-app-service-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
+
